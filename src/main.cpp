@@ -36,7 +36,9 @@ void DHT(void);
 
 // INCLUDE SECTION
 #include "arduino.h"        // add arduino library
-#include <IRremote.h>       // add IRremote library
+//#include <IRremote.h>       // add IRremote library
+#define SEND_PWM_BY_TIMER        // Recommended for ESP32
+#include <IRremote.hpp>
 #include <Wire.h>           // include Wire.h library
 #include "rgb_lcd.h"        // include rgb_lcd library
 #include <TM1637Display.h>  // include 4 Digit Display library
@@ -74,8 +76,8 @@ char buff[16];                       // used by sprintf for 16 char LCD display
 
 
 // INTERRUPT SERVICE ROUTINE SECTION    
-IRrecv irrecv(RECV_PIN);    // Create a class object used to receive class 
-
+//IRrecv irrecv(RECV_PIN);    // Create a class object used to receive class 
+#define IR_RECEIVE_PIN  2
 static portMUX_TYPE my_mutex = portMUX_INITIALIZER_UNLOCKED;                       
 
 void IRAM_ATTR isr()              // puts isr code into RAM for fast response
@@ -89,7 +91,8 @@ void IRAM_ATTR isr()              // puts isr code into RAM for fast response
 void setup()
 {
   Serial.begin(9600);       // Initialize the serial port and set the baud rate to 9600
-  irrecv.enableIRIn();      // Start the receiver
+  //irrecv.enableIRIn();      // Start the receiver
+  IrReceiver.begin(IR_RECEIVE_PIN, ENABLE_LED_FEEDBACK);
   Wire.begin(SDA, SCL);              // attach to the IIC pin
   // set RGB LEDS to OUTPUT
   pinMode(RED_LED, OUTPUT);  
@@ -117,12 +120,13 @@ for(;;)
   while(SELECTOR==0)
   { 
     DHT();
-    if ((irrecv.decode(&results)))           // if ir results are NOT received
+    if ((IrReceiver.decode()) )          // if ir results are NOT received
     {
-    decoded_value=(results.value);            // Get results.value
-    if((decoded_value)!=0xFF30CF)             // if decoded value is NOT 1 from TV Remote
+    decoded_value=IrReceiver.decodedIRData.decodedRawData;            // Get results.value
+    if((decoded_value)!=0xF30CFF00)             // if decoded value is NOT 1 from TV Remote
     {
-       irrecv.resume();                       // set to Receive the next value
+       //irrecv.resume();                       // set to Receive the next value
+       IrReceiver.resume();
     }
     else
     {
@@ -132,22 +136,24 @@ for(;;)
        BUTTON1_ALARM_ON();                    // Alarm On Message
        //delay(200);
        SELECTOR=1;
-       irrecv.resume();                       //Receive the next value
+       //irrecv.resume();                       //Receive the next value
+       IrReceiver.resume();
     }
    }
   } 
  while(SELECTOR==1)
  {
-  while (!(irrecv.decode(&results)));        // while ir results are NOT received
-   decoded_value=(results.value);            // received results go into decoded.value
+  while (!(IrReceiver.decode()));        // while ir results are NOT received
+   decoded_value=IrReceiver.decodedIRData.decodedRawData;
    // If decoded value is NOT 2-key or 4-key
-   if(((decoded_value)!=0xFF18E7)&&((decoded_value)!=0xff10EF))
+   if(((decoded_value)!=0xE718FF00)&&((decoded_value)!=0xF708FF00))
    {
-     irrecv.resume();                         // Receive the next value
+     //irrecv.resume();                         // Receive the next value
+     IrReceiver.resume();
    }
    else
    {
-     if(decoded_value==0xFF18E7)              // if decoded value is 2-key
+     if(decoded_value==0xE718FF00)              // if decoded value is 2-key
      {
        BUTTON2_ALARM_ARM();                   // put up ALARM_ARM message on LCD
        digitalWrite(GREEN_LED,1);             // TURN OFF GREEN and BLUE LEDS
@@ -165,7 +171,8 @@ for(;;)
         delay(3000);                          // wait 3 seconds
         digitalWrite(RED_LED,1);              // turn off RED and BLUE LEDS (Purple)
         digitalWrite(BLUE_LED,1);
-        irrecv.resume();                      // Receive the next value
+        //irrecv.resume();                      // Receive the next value
+        IrReceiver.resume();
         lcd.setRGB(0,0,0);                    // turn off all lcd colours
         lcd.clear();                          // clear text on LCD
         
@@ -207,18 +214,21 @@ for(;;)
     digitalWrite(RED_LED,1);        // TURN OFF RED LED
     digitalWrite(GREEN_LED,1);      // TURN OFF GREEN LED
     digitalWrite(BLUE_LED,1);       // TURN OFF BLUE LED
-    irrecv.resume();                         // Receive the next value
+    //irrecv.resume();                         // Receive the next value
+    IrReceiver.resume();
   }
   while(SELECTOR==4)
   {
     ALARM_SOUNDING();               // LCD gets ALARM SOUNDING MESSAGE
     digitalWrite(RED_LED,0);
     digitalWrite(BLUE_LED,0);
-    while (!(irrecv.decode(&results)));       // while ir results are NOT received
-    decoded_value=(results.value);            // Get results.value
-    if((decoded_value)!=0xFF7A85)          // while decoded value is NOT 3 from TV Remote
+   // while (!(irrecv.decode(&results)));       // while ir results are NOT received
+   while (!IrReceiver.decode());
+    decoded_value=IrReceiver.decodedIRData.decodedRawData;
+    if((decoded_value)!=0xA15EFF00)          // while decoded value is NOT 3 from TV Remote
     {
-     irrecv.resume();                         // Receive the next value
+    // irrecv.resume();                         // Receive the next value
+    IrReceiver.resume();
     }
    else
    {
